@@ -2,13 +2,23 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import type { Request, Response } from 'express';
+import express from 'express';
 
-let cachedServer: any;
+const server = express();
+let isBootstrapped = false;
 
 async function bootstrap() {
-  if (!cachedServer) {
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  if (!isBootstrapped) {
+    const app = await NestFactory.create(
+      AppModule,
+      new ExpressAdapter(server),
+      { logger: ['error', 'warn', 'log'] }
+    );
+
+    // Set global prefix to avoid conflicts
+    app.setGlobalPrefix('');
 
     // Enable CORS
     app.enableCors();
@@ -46,18 +56,22 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
+    SwaggerModule.setup('api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+      customSiteTitle: 'NestJS Backend API',
+      customfavIcon: 'https://nestjs.com/img/logo-small.svg',
+      customCss: '.swagger-ui .topbar { display: none }',
+    });
 
     await app.init();
-
-    cachedServer = app.getHttpAdapter().getInstance();
+    isBootstrapped = true;
   }
-
-  return cachedServer;
 }
 
-export default async (req: any, res: any) => {
-  const server = await bootstrap();
-  return server(req, res);
+export default async (req: Request, res: Response) => {
+  await bootstrap();
+  server(req, res);
 };
 

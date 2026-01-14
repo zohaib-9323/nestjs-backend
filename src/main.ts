@@ -42,7 +42,14 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+    customSiteTitle: 'NestJS Backend API',
+    customfavIcon: 'https://nestjs.com/img/logo-small.svg',
+    customCss: '.swagger-ui .topbar { display: none }',
+  });
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
