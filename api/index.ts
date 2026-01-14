@@ -56,6 +56,13 @@ async function bootstrap() {
       customSiteTitle: 'NestJS Backend API',
       customfavIcon: 'https://nestjs.com/img/logo-small.svg',
       customCss: '.swagger-ui .topbar { display: none }',
+      customJs: [
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+      ],
+      customCssUrl: [
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+      ],
     });
 
     await app.init();
