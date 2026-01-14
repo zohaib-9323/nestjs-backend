@@ -2,23 +2,16 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
-import { ExpressAdapter } from '@nestjs/platform-express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
-import express from 'express';
 
-const server = express();
-let isBootstrapped = false;
+let app: NestExpressApplication;
 
 async function bootstrap() {
-  if (!isBootstrapped) {
-    const app = await NestFactory.create(
-      AppModule,
-      new ExpressAdapter(server),
-      { logger: ['error', 'warn', 'log'] }
-    );
-
-    // Set global prefix to avoid conflicts
-    app.setGlobalPrefix('');
+  if (!app) {
+    app = await NestFactory.create<NestExpressApplication>(AppModule, {
+      logger: ['error', 'warn', 'log'],
+    });
 
     // Enable CORS
     app.enableCors();
@@ -66,12 +59,12 @@ async function bootstrap() {
     });
 
     await app.init();
-    isBootstrapped = true;
   }
+  return app;
 }
 
 export default async (req: Request, res: Response) => {
-  await bootstrap();
-  server(req, res);
+  const nestApp = await bootstrap();
+  return nestApp.getHttpAdapter().getInstance()(req, res);
 };
 
