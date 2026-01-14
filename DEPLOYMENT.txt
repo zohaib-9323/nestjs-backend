@@ -1,0 +1,181 @@
+═══════════════════════════════════════════════════════════════════
+  VERCEL DEPLOYMENT GUIDE - NestJS Backend
+═══════════════════════════════════════════════════════════════════
+
+📋 PREREQUISITES
+─────────────────────────────────────────────────────────────────── 
+1. Vercel account (sign up at https://vercel.com)
+2. Vercel CLI installed: npm i -g vercel
+3. MongoDB Atlas account with a cluster set up
+4. Git repository (optional but recommended)
+
+
+🔧 SETUP STEPS
+───────────────────────────────────────────────────────────────────
+
+STEP 1: Install Dependencies
+─────────────────────────────
+Run in your project directory:
+  npm install
+
+
+STEP 2: Set Up Environment Variables in Vercel
+───────────────────────────────────────────────
+You need to configure these environment variables in Vercel:
+
+Required Variables:
+  • MONGODB_URI          - Your MongoDB connection string
+  • JWT_SECRET           - Secret key for JWT tokens
+  • JWT_EXPIRES_IN       - Token expiration time (e.g., "7d")
+  • PORT                 - Set to 3000
+  • NODE_ENV            - Set to "production"
+
+MongoDB URI Format:
+  mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
+
+Alternative (if using separate DB variables):
+  • DB_USERNAME
+  • DB_PASSWORD
+  • DB_CLUSTER
+  • DB_NAME
+
+
+STEP 3: Deploy to Vercel
+─────────────────────────
+
+Option A: Deploy via Vercel CLI (Recommended)
+──────────────────────────────────────────────
+1. Login to Vercel:
+   vercel login
+
+2. Deploy (first time):
+   vercel
+
+   - Follow the prompts
+   - Link to existing project or create new one
+   - Accept default settings
+
+3. Set environment variables:
+   vercel env add MONGODB_URI
+   vercel env add JWT_SECRET
+   vercel env add JWT_EXPIRES_IN
+   vercel env add PORT
+   vercel env add NODE_ENV
+
+4. Deploy to production:
+   vercel --prod
+
+
+Option B: Deploy via Vercel Dashboard
+──────────────────────────────────────
+1. Go to https://vercel.com/dashboard
+2. Click "Add New" → "Project"
+3. Import your Git repository
+4. Configure project:
+   - Framework Preset: Other
+   - Build Command: npm run vercel-build
+   - Output Directory: (leave empty)
+   - Install Command: npm install
+
+5. Add environment variables:
+   - Go to Project Settings → Environment Variables
+   - Add all required variables listed in STEP 2
+
+6. Click "Deploy"
+
+
+Option C: Deploy without Git
+─────────────────────────────
+1. From project directory, run:
+   vercel
+
+2. Follow the prompts and deploy
+
+
+📝 IMPORTANT NOTES
+───────────────────────────────────────────────────────────────────
+
+1. MongoDB Atlas Setup:
+   - Ensure your MongoDB Atlas cluster is accessible
+   - Whitelist Vercel's IP addresses (or use 0.0.0.0/0 for testing)
+   - Get your connection string from Atlas dashboard
+
+2. Security:
+   - Never commit .env files to Git
+   - Use strong JWT_SECRET (minimum 32 characters)
+   - Keep your MongoDB credentials secure
+
+3. Testing:
+   - After deployment, test your API endpoints
+   - Check Swagger docs at: https://your-domain.vercel.app/api
+   - Monitor logs: vercel logs
+
+4. Custom Domain (Optional):
+   - Add custom domain in Vercel dashboard
+   - Configure DNS settings as instructed
+
+
+🚀 POST-DEPLOYMENT
+───────────────────────────────────────────────────────────────────
+
+1. Test your endpoints:
+   - API Base URL: https://your-project.vercel.app
+   - Swagger Docs: https://your-project.vercel.app/api
+
+2. Create superadmin (if needed):
+   POST https://your-project.vercel.app/auth/superadmin
+   Body: { "email": "admin@example.com", "password": "securepassword" }
+
+3. Monitor deployment:
+   vercel logs --follow
+
+
+🔄 UPDATING YOUR DEPLOYMENT
+───────────────────────────────────────────────────────────────────
+
+For Git-connected projects:
+  - Push changes to your repository
+  - Vercel automatically deploys on push
+
+For manual deployments:
+  vercel --prod
+
+
+📚 USEFUL COMMANDS
+───────────────────────────────────────────────────────────────────
+
+vercel                  # Deploy to preview
+vercel --prod          # Deploy to production
+vercel logs            # View deployment logs
+vercel env ls          # List environment variables
+vercel domains         # Manage domains
+vercel inspect [url]   # Inspect deployment
+
+
+🆘 TROUBLESHOOTING
+───────────────────────────────────────────────────────────────────
+
+Issue: MongoDB connection fails
+Solution: Check MONGODB_URI, whitelist IPs in Atlas
+
+Issue: 500 Internal Server Error
+Solution: Check Vercel logs with 'vercel logs'
+
+Issue: Module not found
+Solution: Ensure all dependencies are in package.json dependencies (not devDependencies)
+
+Issue: Cold start delays
+Solution: This is normal for serverless - first request may be slow
+
+
+🔗 HELPFUL LINKS
+───────────────────────────────────────────────────────────────────
+
+- Vercel Documentation: https://vercel.com/docs
+- Vercel CLI: https://vercel.com/docs/cli
+- MongoDB Atlas: https://www.mongodb.com/cloud/atlas
+- NestJS: https://docs.nestjs.com
+
+
+═══════════════════════════════════════════════════════════════════
+

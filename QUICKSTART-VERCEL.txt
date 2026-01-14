@@ -1,0 +1,35 @@
+🚀 QUICK VERCEL DEPLOYMENT - 3 SIMPLE STEPS
+════════════════════════════════════════════════════════════
+
+STEP 1: Install Vercel CLI
+───────────────────────────
+npm i -g vercel
+
+
+STEP 2: Set Environment Variables
+──────────────────────────────────
+Before deploying, you'll need:
+
+✓ MONGODB_URI     = mongodb+srv://user:pass@cluster.mongodb.net/db
+✓ JWT_SECRET      = your-super-secret-key-min-32-chars
+✓ JWT_EXPIRES_IN  = 7d
+✓ PORT            = 3000
+✓ NODE_ENV        = production
+
+
+STEP 3: Deploy
+──────────────
+vercel login
+vercel
+
+(Then add env vars when prompted or via dashboard)
+
+
+📍 YOUR API WILL BE AT:
+───────────────────────
+• Base URL: https://your-project.vercel.app
+• Swagger:  https://your-project.vercel.app/api
+
+
+For detailed instructions, see DEPLOYMENT.txt
+
