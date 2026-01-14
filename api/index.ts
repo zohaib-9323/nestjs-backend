@@ -2,18 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
-const expressApp = express();
-let app: any;
+let cachedServer: any;
 
-async function createNestApp() {
-  if (!app) {
-    app = await NestFactory.create(
-      AppModule,
-      new ExpressAdapter(expressApp),
-    );
+async function bootstrap() {
+  if (!cachedServer) {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
     // Enable CORS
     app.enableCors();
@@ -54,12 +49,15 @@ async function createNestApp() {
     SwaggerModule.setup('api', app, document);
 
     await app.init();
+
+    cachedServer = app.getHttpAdapter().getInstance();
   }
-  return expressApp;
+
+  return cachedServer;
 }
 
 export default async (req: any, res: any) => {
-  await createNestApp();
-  return expressApp(req, res);
+  const server = await bootstrap();
+  return server(req, res);
 };
 
