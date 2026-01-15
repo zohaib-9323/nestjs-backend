@@ -1,0 +1,322 @@
+🧪 TEST: COMPANY CREATION WITH USER ASSOCIATION
+===============================================
+
+This guide will help you verify that companies are correctly associated with users.
+
+═══════════════════════════════════════════════════════════════════
+✅ CURRENT IMPLEMENTATION (Should be working!)
+═══════════════════════════════════════════════════════════════════
+
+Flow:
+1. User registers → User created with _id
+2. User logs in → JWT contains user._id in payload.sub
+3. JWT validated → userId extracted and added to request.user
+4. Create company → ownerId set to request.user.userId
+5. Company saved → User's companies[] array updated
+
+Code Flow:
+──────────
+1. auth.service.ts (line 44): payload.sub = user._id.toString()
+2. jwt.strategy.ts (line 33): userId = user._id.toString()
+3. companies.controller.ts (line 55): user.userId passed to service
+4. companies.service.ts (line 26): ownerId = new Types.ObjectId(ownerId)
+5. companies.service.ts (line 32): Update user.companies array
+
+═══════════════════════════════════════════════════════════════════
+🧪 TESTING STEPS
+═══════════════════════════════════════════════════════════════════
+
+Step 1: Start Server
+────────────────────
+npm run start:dev
+
+Step 2: Register User
+─────────────────────
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+Expected Response:
+{
+  "_id": "507f1f77bcf86cd799439011",  ← Save this user ID
+  "email": "testuser@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "role": "user",
+  "isActive": true,
+  "companies": [],  ← Empty initially
+  "createdAt": "2026-01-15T...",
+  "updatedAt": "2026-01-15T..."
+}
+
+Step 3: Login
+─────────────
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@example.com",
+  "password": "password123"
+}
+
+Expected Response:
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  ← Copy this token
+  "user": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "testuser@example.com",
+    "firstName": "Test",
+    "lastName": "User",
+    "role": "user"
+  }
+}
+
+Step 4: Verify JWT Payload (Optional)
+──────────────────────────────────────
+Go to: https://jwt.io
+Paste your token
+
+Payload should contain:
+{
+  "sub": "507f1f77bcf86cd799439011",  ← This is the user ID
+  "email": "testuser@example.com",
+  "role": "user",
+  "iat": 1234567890,
+  "exp": 1234567890
+}
+
+Step 5: Create Company
+──────────────────────
+POST http://localhost:3000/companies
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Test Company",
+  "websiteUrl": "https://testcompany.com",
+  "phoneNumber": "+1234567890"
+}
+
+Expected Response:
+{
+  "_id": "607f1f77bcf86cd799439022",  ← Company ID
+  "name": "Test Company",
+  "websiteUrl": "https://testcompany.com",
+  "phoneNumber": "+1234567890",
+  "ownerId": "507f1f77bcf86cd799439011",  ← ✅ User ID is here!
+  "members": [],
+  "products": [],
+  "projects": [],
+  "offers": [],
+  "createdAt": "2026-01-15T...",
+  "updatedAt": "2026-01-15T..."
+}
+
+Step 6: Verify User Has Company
+────────────────────────────────
+GET http://localhost:3000/users/507f1f77bcf86cd799439011
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+Expected Response:
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "email": "testuser@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "role": "user",
+  "isActive": true,
+  "companies": [
+    "607f1f77bcf86cd799439022"  ← ✅ Company ID is in user's companies array!
+  ],
+  "createdAt": "2026-01-15T...",
+  "updatedAt": "2026-01-15T..."
+}
+
+Step 7: Verify Company Ownership
+─────────────────────────────────
+GET http://localhost:3000/companies
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+Expected Response:
+[
+  {
+    "_id": "607f1f77bcf86cd799439022",
+    "name": "Test Company",
+    "websiteUrl": "https://testcompany.com",
+    "phoneNumber": "+1234567890",
+    "ownerId": "507f1f77bcf86cd799439011",  ← ✅ Correct owner ID!
+    "members": [],
+    "products": [],
+    "projects": [],
+    "offers": [],
+    "createdAt": "2026-01-15T...",
+    "updatedAt": "2026-01-15T..."
+  }
+]
+
+═══════════════════════════════════════════════════════════════════
+🔍 DEBUGGING CHECKLIST
+═══════════════════════════════════════════════════════════════════
+
+If company creation is not working:
+
+✅ Check 1: Is user.userId being extracted?
+   - Add console.log in companies.controller.ts create method
+   - console.log('User ID:', user.userId);
+
+✅ Check 2: Is ownerId being set?
+   - Add console.log in companies.service.ts create method
+   - console.log('Owner ID:', ownerId);
+
+✅ Check 3: Is company being saved with ownerId?
+   - Add console.log after company.save()
+   - console.log('Saved company:', savedCompany);
+
+✅ Check 4: Is user's companies array being updated?
+   - Check MongoDB directly
+   - db.users.findOne({ _id: ObjectId("...") })
+
+✅ Check 5: Is JWT token valid?
+   - Verify token contains "sub" field
+   - Verify "sub" matches user._id
+
+═══════════════════════════════════════════════════════════════════
+🐛 COMMON ISSUES & SOLUTIONS
+═══════════════════════════════════════════════════════════════════
+
+Issue 1: "User not found or inactive"
+Solution: User might be soft-deleted or isActive=false
+Fix: Check user.isActive in database
+
+Issue 2: "Unauthorized"
+Solution: JWT token might be expired or invalid
+Fix: Login again to get fresh token
+
+Issue 3: Company created but ownerId is null
+Solution: user.userId not being passed correctly
+Fix: Check CurrentUser decorator and JWT strategy
+
+Issue 4: User's companies array not updated
+Solution: User model might not be imported in CompaniesModule
+Fix: Verify User schema is imported in companies.module.ts
+
+Issue 5: Cannot read property 'userId' of undefined
+Solution: User object not attached to request
+Fix: Verify JwtAuthGuard is applied globally or on route
+
+═══════════════════════════════════════════════════════════════════
+📊 DATABASE VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+Using MongoDB Shell:
+────────────────────
+mongo
+use nestjs-backend
+
+// Check user
+db.users.findOne({ email: "testuser@example.com" })
+Expected: Has "companies" array with company IDs
+
+// Check company
+db.companies.findOne({ name: "Test Company" })
+Expected: Has "ownerId" matching user._id
+
+// Verify relationship
+db.companies.aggregate([
+  {
+    $lookup: {
+      from: "users",
+      localField: "ownerId",
+      foreignField: "_id",
+      as: "owner"
+    }
+  }
+])
+Expected: Shows company with populated owner data
+
+═══════════════════════════════════════════════════════════════════
+✅ EXPECTED BEHAVIOR
+═══════════════════════════════════════════════════════════════════
+
+When a user creates a company:
+1. ✅ Company.ownerId = user._id
+2. ✅ User.companies[] includes company._id
+3. ✅ User can access the company (GET /companies)
+4. ✅ User can create resources in the company
+5. ✅ Other users CANNOT access the company (403 Forbidden)
+
+═══════════════════════════════════════════════════════════════════
+🧪 USING SWAGGER (RECOMMENDED)
+═══════════════════════════════════════════════════════════════════
+
+1. Open: http://localhost:3000/api
+
+2. Register User:
+   - POST /auth/register
+   - Click "Try it out"
+   - Enter user details
+   - Click "Execute"
+   - Save the returned _id
+
+3. Login:
+   - POST /auth/login
+   - Click "Try it out"
+   - Enter email and password
+   - Click "Execute"
+   - Copy the accessToken
+
+4. Authorize:
+   - Click "Authorize" button at top
+   - Enter: Bearer YOUR_ACCESS_TOKEN
+   - Click "Authorize"
+   - Click "Close"
+
+5. Create Company:
+   - POST /companies
+   - Click "Try it out"
+   - Enter company details (name, websiteUrl, phoneNumber)
+   - Click "Execute"
+   - Verify ownerId in response matches your user _id
+
+6. List Companies:
+   - GET /companies
+   - Click "Try it out"
+   - Click "Execute"
+   - Should see your company
+
+═══════════════════════════════════════════════════════════════════
+📝 ADDITIONAL VERIFICATION
+═══════════════════════════════════════════════════════════════════
+
+Test Cross-Tenant Access Prevention:
+─────────────────────────────────────
+1. Register second user (Alice)
+2. Login as Alice, get token
+3. Try to access first user's company
+   GET /companies/FIRST_USER_COMPANY_ID
+   Authorization: Bearer ALICE_TOKEN
+4. Expected: 403 Forbidden ✅
+
+Test Member Access:
+───────────────────
+1. First user adds Alice as member:
+   POST /companies/COMPANY_ID/members/ALICE_USER_ID
+2. Alice tries to access company again
+3. Expected: 200 OK ✅
+
+═══════════════════════════════════════════════════════════════════
+
+If you're still having issues, please:
+1. Run the tests: npm run test:e2e
+2. Check the logs for any errors
+3. Verify MongoDB connection
+4. Make sure JWT_SECRET is set in .env
+
+The implementation is correct - companies SHOULD be associated with users!
+

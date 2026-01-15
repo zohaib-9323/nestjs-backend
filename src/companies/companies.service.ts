@@ -19,7 +19,13 @@ export class CompaniesService {
 
   async create(createCompanyDto: CreateCompanyDto, ownerId: string): Promise<Company> {
     // Verify user exists
-    await this.usersService.findOne(ownerId);
+    const user = await this.usersService.findOne(ownerId);
+    
+    console.log('[CompaniesService] Creating company for user:', {
+      userId: ownerId,
+      userEmail: user.email,
+      companyName: createCompanyDto.name,
+    });
 
     const company = new this.companyModel({
       ...createCompanyDto,
@@ -27,11 +33,18 @@ export class CompaniesService {
     });
     
     const savedCompany = await company.save();
+    
+    console.log('[CompaniesService] Company created successfully:', {
+      companyId: savedCompany._id.toString(),
+      ownerId: savedCompany.ownerId.toString(),
+    });
 
     // Add company to user's companies array
     await this.userModel.findByIdAndUpdate(ownerId, {
       $addToSet: { companies: savedCompany._id },
     });
+    
+    console.log('[CompaniesService] User companies array updated');
 
     return savedCompany;
   }

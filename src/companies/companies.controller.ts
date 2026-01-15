@@ -50,10 +50,18 @@ export class CompaniesController {
     @Body() createCompanyDto: CreateCompanyDto,
     @CurrentUser() user: any,
   ): Promise<CompanyResponseDto> {
+    console.log('[CompaniesController] Create company request:', {
+      userId: user.userId,
+      userEmail: user.email,
+      userRole: user.role,
+      companyData: createCompanyDto,
+    });
+    
     const company = await this.companiesService.create(
       createCompanyDto,
       user.userId,
     );
+    
     return plainToInstance(CompanyResponseDto, company, {
       excludeExtraneousValues: true,
     });
