@@ -1,4 +1,4 @@
-import { IsString, IsUrl, IsNotEmpty, IsMongoId } from 'class-validator';
+import { IsString, IsUrl, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCompanyDto {
@@ -25,14 +25,6 @@ export class CreateCompanyDto {
   @IsString()
   @IsNotEmpty()
   phoneNumber: string;
-
-  @ApiProperty({
-    description: 'User ID who owns the company (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439011',
-  })
-  @IsMongoId()
-  @IsNotEmpty()
-  userId: string;
 }
 
 

@@ -4,11 +4,10 @@ import {
   Body,
   Get,
   Param,
-  Put,
+  Patch,
   Delete,
   HttpCode,
   HttpStatus,
-  Query,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
@@ -17,7 +16,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
@@ -29,8 +27,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '../common/enums/role.enum';
+import { plainToInstance } from 'class-transformer';
 
-@ApiTags('companies')
+@ApiTags('Companies')
 @Controller('companies')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
@@ -51,53 +50,39 @@ export class CompaniesController {
     @Body() createCompanyDto: CreateCompanyDto,
     @CurrentUser() user: any,
   ): Promise<CompanyResponseDto> {
-    // If user is not admin/superadmin, they can only create companies for themselves
-    if (user.role === Role.USER) {
-      createCompanyDto.userId = user.userId;
-    }
-    const company = await this.companiesService.create(createCompanyDto);
-    const { _id, userId, ...rest } = company;
-    return {
-      id: _id.toString(),
-      userId: typeof userId === 'object' ? userId.toString() : userId,
-      ...rest,
-    } as CompanyResponseDto;
+    const company = await this.companiesService.create(
+      createCompanyDto,
+      user.userId,
+    );
+    return plainToInstance(CompanyResponseDto, company, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get()
   @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
-  @ApiOperation({ summary: 'Get all companies or filter by user ID' })
-  @ApiQuery({
-    name: 'userId',
-    required: false,
-    description: 'Filter companies by user ID',
-  })
+  @ApiOperation({ summary: 'Get all companies accessible to the current user' })
   @ApiResponse({
     status: 200,
     description: 'List of companies',
     type: [CompanyResponseDto],
   })
-  async findAll(
-    @Query('userId') userId?: string,
-    @CurrentUser() user?: any,
-  ): Promise<CompanyResponseDto[]> {
+  async findAll(@CurrentUser() user: any): Promise<CompanyResponseDto[]> {
     let companies;
-    // Regular users can only see their own companies
-    if (user.role === Role.USER) {
-      companies = await this.companiesService.findByUserId(user.userId);
-    } else if (userId) {
-      companies = await this.companiesService.findByUserId(userId);
-    } else {
+
+    if (user.role === Role.SUPERADMIN) {
+      // SuperAdmin can see all companies
       companies = await this.companiesService.findAll();
+    } else {
+      // Regular users and admins see companies where they are owner or member
+      companies = await this.companiesService.findUserCompanies(user.userId);
     }
-    return companies.map((company) => {
-      const { _id, userId, ...rest } = company;
-      return {
-        id: _id.toString(),
-        userId: typeof userId === 'object' ? userId.toString() : userId,
-        ...rest,
-      } as CompanyResponseDto;
-    });
+
+    return companies.map((company) =>
+      plainToInstance(CompanyResponseDto, company, {
+        excludeExtraneousValues: true,
+      }),
+    );
   }
 
   @Get(':id')
@@ -112,25 +97,28 @@ export class CompaniesController {
   @ApiResponse({ status: 404, description: 'Company not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user: any,
   ): Promise<CompanyResponseDto> {
     const company = await this.companiesService.findOne(id);
-    // Regular users can only access their own companies
-    if (
-      user.role === Role.USER &&
-      company.userId.toString() !== user.userId
-    ) {
-      throw new ForbiddenException('You can only access your own companies');
+
+    // Check if user has access
+    if (user.role !== Role.SUPERADMIN) {
+      const isOwner = company.ownerId.toString() === user.userId;
+      const isMember = company.members?.some(
+        (memberId) => memberId.toString() === user.userId,
+      );
+
+      if (!isOwner && !isMember) {
+        throw new ForbiddenException('You do not have access to this company');
+      }
     }
-    const { _id, userId, ...rest } = company;
-    return {
-      id: _id.toString(),
-      userId: typeof userId === 'object' ? userId.toString() : userId,
-      ...rest,
-    } as CompanyResponseDto;
+
+    return plainToInstance(CompanyResponseDto, company, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  @Put(':id')
+  @Patch(':id')
   @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
   @ApiOperation({ summary: 'Update company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
@@ -143,26 +131,91 @@ export class CompaniesController {
   async update(
     @Param('id') id: string,
     @Body() updateCompanyDto: UpdateCompanyDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user: any,
   ): Promise<CompanyResponseDto> {
     const company = await this.companiesService.findOne(id);
-    // Regular users can only update their own companies
+
+    // Only owner and superadmin can update
     if (
-      user.role === Role.USER &&
-      company.userId.toString() !== user.userId
+      user.role !== Role.SUPERADMIN &&
+      company.ownerId.toString() !== user.userId
     ) {
-      throw new ForbiddenException('You can only update your own companies');
+      throw new ForbiddenException(
+        'Only the company owner can update company details',
+      );
     }
+
     const updatedCompany = await this.companiesService.update(
       id,
       updateCompanyDto,
     );
-    const { _id, userId, ...rest } = updatedCompany;
-    return {
-      id: _id.toString(),
-      userId: typeof userId === 'object' ? userId.toString() : userId,
-      ...rest,
-    } as CompanyResponseDto;
+    return plainToInstance(CompanyResponseDto, updatedCompany, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Post(':id/members/:userId')
+  @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
+  @ApiOperation({ summary: 'Add a member to the company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiParam({ name: 'userId', description: 'User ID to add as member' })
+  @ApiResponse({
+    status: 200,
+    description: 'Member added successfully',
+    type: CompanyResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Company or User not found' })
+  async addMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: any,
+  ): Promise<CompanyResponseDto> {
+    const company = await this.companiesService.findOne(id);
+
+    // Only owner and superadmin can add members
+    if (
+      user.role !== Role.SUPERADMIN &&
+      company.ownerId.toString() !== user.userId
+    ) {
+      throw new ForbiddenException('Only the company owner can add members');
+    }
+
+    const updatedCompany = await this.companiesService.addMember(id, userId);
+    return plainToInstance(CompanyResponseDto, updatedCompany, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Delete(':id/members/:userId')
+  @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
+  @ApiOperation({ summary: 'Remove a member from the company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiParam({ name: 'userId', description: 'User ID to remove from members' })
+  @ApiResponse({
+    status: 200,
+    description: 'Member removed successfully',
+    type: CompanyResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Company or User not found' })
+  async removeMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: any,
+  ): Promise<CompanyResponseDto> {
+    const company = await this.companiesService.findOne(id);
+
+    // Only owner and superadmin can remove members
+    if (
+      user.role !== Role.SUPERADMIN &&
+      company.ownerId.toString() !== user.userId
+    ) {
+      throw new ForbiddenException('Only the company owner can remove members');
+    }
+
+    const updatedCompany = await this.companiesService.removeMember(id, userId);
+    return plainToInstance(CompanyResponseDto, updatedCompany, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Delete(':id')

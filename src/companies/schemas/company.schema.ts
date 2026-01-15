@@ -17,7 +17,19 @@ export class Company {
   phoneNumber: string;
 
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  userId: Types.ObjectId;
+  ownerId: Types.ObjectId;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  members: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
+  products: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Project' }], default: [] })
+  projects: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Offer' }], default: [] })
+  offers: Types.ObjectId[];
 
   createdAt: Date;
   updatedAt: Date;

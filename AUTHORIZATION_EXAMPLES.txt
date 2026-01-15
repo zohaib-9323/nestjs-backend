@@ -1,0 +1,287 @@
+🔐 MULTI-TENANT AUTHORIZATION EXAMPLES
+========================================
+
+This file demonstrates how the CompanyAccessGuard works in practice.
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 1: Regular User Accessing Their Own Company
+═══════════════════════════════════════════════════════════════════
+
+User: john@example.com (role: USER)
+User ID: 507f1f77bcf86cd799439011
+Companies owned: [Company A: 607f1f77bcf86cd799439022]
+
+Request: GET /companies/607f1f77bcf86cd799439022/products
+Headers: Authorization: Bearer <john's-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract user from JWT: john@example.com
+2. ✅ Extract companyId from params: 607f1f77bcf86cd799439022
+3. ✅ Query database: Find Company A
+4. ✅ Check ownership: company.ownerId === user.userId → TRUE
+5. ✅ Result: ALLOWED (200 OK)
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 2: Regular User Accessing Another User's Company
+═══════════════════════════════════════════════════════════════════
+
+User: john@example.com (role: USER)
+User ID: 507f1f77bcf86cd799439011
+Companies owned: [Company A: 607f1f77bcf86cd799439022]
+
+Request: GET /companies/707f1f77bcf86cd799439033/products
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          This is Company B owned by alice@example.com
+Headers: Authorization: Bearer <john's-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract user from JWT: john@example.com
+2. ✅ Extract companyId from params: 707f1f77bcf86cd799439033
+3. ✅ Query database: Find Company B
+4. ❌ Check ownership: company.ownerId === user.userId → FALSE
+5. ❌ Check membership: user.userId in company.members → FALSE
+6. ❌ Result: FORBIDDEN (403)
+
+Response:
+{
+  "statusCode": 403,
+  "message": "Access denied: You do not have permission to access this company"
+}
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 3: Company Member Accessing Company Resources
+═══════════════════════════════════════════════════════════════════
+
+User: bob@example.com (role: USER)
+User ID: 807f1f77bcf86cd799439044
+Companies owned: []
+Member of: [Company A: 607f1f77bcf86cd799439022]
+
+Request: GET /companies/607f1f77bcf86cd799439022/projects
+Headers: Authorization: Bearer <bob's-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract user from JWT: bob@example.com
+2. ✅ Extract companyId from params: 607f1f77bcf86cd799439022
+3. ✅ Query database: Find Company A
+4. ❌ Check ownership: company.ownerId === user.userId → FALSE
+5. ✅ Check membership: user.userId in company.members → TRUE
+6. ✅ Result: ALLOWED (200 OK)
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 4: SuperAdmin Accessing Any Company
+═══════════════════════════════════════════════════════════════════
+
+User: admin@system.com (role: SUPERADMIN)
+User ID: 907f1f77bcf86cd799439055
+Companies owned: []
+Member of: []
+
+Request: GET /companies/607f1f77bcf86cd799439022/offers
+Headers: Authorization: Bearer <admin's-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract user from JWT: admin@system.com
+2. ✅ Check role: user.role === SUPERADMIN → TRUE
+3. ✅ Result: ALLOWED (200 OK) - Bypass all checks
+
+Note: SuperAdmin can access ALL companies regardless of ownership/membership
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 5: Creating Resources Within a Company
+═══════════════════════════════════════════════════════════════════
+
+User: john@example.com (role: USER)
+User ID: 507f1f77bcf86cd799439011
+Companies owned: [Company A: 607f1f77bcf86cd799439022]
+
+Request: POST /companies/607f1f77bcf86cd799439022/products
+Headers: Authorization: Bearer <john's-jwt-token>
+Body:
+{
+  "name": "New Laptop",
+  "description": "Gaming laptop",
+  "price": 1499.99
+}
+
+Flow:
+1. ✅ CompanyAccessGuard validates access to Company A
+2. ✅ ProductsController.create() receives the request
+3. ✅ ProductsService creates product with companyId
+4. ✅ Product is linked to Company A
+5. ✅ Company A's products array is updated
+6. ✅ Result: Product created (201 Created)
+
+Database Changes:
+- New Product document created with companyId: 607f1f77bcf86cd799439022
+- Company A's products array: [..., newProductId]
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 6: Attempting to Create Resource in Wrong Company
+═══════════════════════════════════════════════════════════════════
+
+User: john@example.com (role: USER)
+User ID: 507f1f77bcf86cd799439011
+Companies owned: [Company A: 607f1f77bcf86cd799439022]
+
+Request: POST /companies/707f1f77bcf86cd799439033/products
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        Company B (owned by Alice)
+Headers: Authorization: Bearer <john's-jwt-token>
+Body:
+{
+  "name": "Hacker Laptop",
+  "description": "Trying to add to wrong company",
+  "price": 9999.99
+}
+
+Flow:
+1. ❌ CompanyAccessGuard validates access to Company B
+2. ❌ Check fails: John is not owner or member
+3. ❌ Result: FORBIDDEN (403)
+4. ❌ Product is NEVER created
+
+Security: The guard prevents the request from even reaching the service layer!
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 7: Member Management
+═══════════════════════════════════════════════════════════════════
+
+User: john@example.com (role: USER)
+User ID: 507f1f77bcf86cd799439011
+Companies owned: [Company A: 607f1f77bcf86cd799439022]
+
+Action: Add Bob as a member to Company A
+
+Request: POST /companies/607f1f77bcf86cd799439022/members/807f1f77bcf86cd799439044
+Headers: Authorization: Bearer <john's-jwt-token>
+
+Flow:
+1. ✅ Verify John is the owner of Company A
+2. ✅ Add Bob's ID to Company A's members array
+3. ✅ Add Company A's ID to Bob's companies array
+4. ✅ Result: Bob can now access Company A resources
+
+After this:
+- Bob can GET/POST/PATCH/DELETE resources in Company A
+- Bob CANNOT add/remove other members (only owner can)
+- Bob CANNOT update company details (only owner can)
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 8: Invalid Company ID
+═══════════════════════════════════════════════════════════════════
+
+Request: GET /companies/invalid-id-format/products
+Headers: Authorization: Bearer <valid-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract companyId: "invalid-id-format"
+2. ❌ Validate ObjectId format → INVALID
+3. ❌ Result: FORBIDDEN (403)
+
+Response:
+{
+  "statusCode": 403,
+  "message": "Invalid company ID format"
+}
+
+═══════════════════════════════════════════════════════════════════
+SCENARIO 9: Non-Existent Company
+═══════════════════════════════════════════════════════════════════
+
+Request: GET /companies/999f1f77bcf86cd799439999/products
+         (Valid ObjectId format but company doesn't exist)
+Headers: Authorization: Bearer <valid-jwt-token>
+
+CompanyAccessGuard Logic:
+1. ✅ Extract companyId: 999f1f77bcf86cd799439999
+2. ✅ Validate ObjectId format → VALID
+3. ✅ Query database for company
+4. ❌ Company not found in database
+5. ❌ Result: FORBIDDEN (403)
+
+Response:
+{
+  "statusCode": 403,
+  "message": "Company not found"
+}
+
+═══════════════════════════════════════════════════════════════════
+CODE IMPLEMENTATION REFERENCE
+═══════════════════════════════════════════════════════════════════
+
+The CompanyAccessGuard (src/auth/guards/company-access.guard.ts):
+
+@Injectable()
+export class CompanyAccessGuard implements CanActivate {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    // 1. SuperAdmin bypass
+    if (user.role === Role.SUPERADMIN) {
+      return true;
+    }
+
+    // 2. Extract and validate companyId
+    const companyId = request.params.companyId;
+    if (!Types.ObjectId.isValid(companyId)) {
+      throw new ForbiddenException('Invalid company ID format');
+    }
+
+    // 3. Check if company exists
+    const company = await this.companyModel.findById(companyId).lean();
+    if (!company) {
+      throw new ForbiddenException('Company not found');
+    }
+
+    // 4. Check ownership
+    if (company.ownerId.toString() === user.userId) {
+      return true;
+    }
+
+    // 5. Check membership
+    const isMember = company.members?.some(
+      (memberId) => memberId.toString() === user.userId,
+    );
+    if (isMember) {
+      return true;
+    }
+
+    // 6. Deny access
+    throw new ForbiddenException(
+      'Access denied: You do not have permission to access this company',
+    );
+  }
+}
+
+═══════════════════════════════════════════════════════════════════
+SECURITY BENEFITS
+═══════════════════════════════════════════════════════════════════
+
+✅ Data Isolation:
+   - Users can only access their own company data
+   - No cross-tenant data leakage
+
+✅ Guard-Level Protection:
+   - Security enforced before reaching business logic
+   - Prevents unauthorized database queries
+
+✅ Clear Access Rules:
+   - Owner: Full control
+   - Member: Can manage resources
+   - SuperAdmin: System-wide access
+   - Others: No access
+
+✅ Consistent Enforcement:
+   - Applied to all company-scoped routes
+   - Single point of authorization logic
+
+✅ Performance:
+   - Efficient database queries with indexes
+   - Single query to check company access
+
+═══════════════════════════════════════════════════════════════════
+
+This pattern is used in production SaaS applications worldwide! 🚀
+

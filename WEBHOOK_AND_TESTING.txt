@@ -1,0 +1,501 @@
+🔗 WEBHOOK INTEGRATION & TESTING GUIDE
+======================================
+
+✅ PROFESSIONAL-LEVEL IMPLEMENTATION
+
+═══════════════════════════════════════════════════════════════════
+📋 OVERVIEW
+═══════════════════════════════════════════════════════════════════
+
+This document covers two advanced features:
+
+1️⃣ Voiceflow Webhook Integration
+   - NLP intent mapping
+   - Dynamic response generation
+   - Public API endpoint (no auth required)
+
+2️⃣ Comprehensive Testing
+   - Unit tests for services
+   - E2E tests for multi-tenant security
+   - E2E tests for webhook integration
+
+═══════════════════════════════════════════════════════════════════
+🔗 WEBHOOK INTEGRATION
+═══════════════════════════════════════════════════════════════════
+
+Purpose:
+--------
+Allow Voiceflow to query your database dynamically during conversations.
+
+Example Flow:
+-------------
+User: "What products do you offer?"
+Voiceflow → POST /voiceflow/webhook { intent: "get_products", companyId: "xxx" }
+Your API → Queries database → Returns products
+Voiceflow → Responds: "We have Premium Laptop for $999.99..."
+
+═══════════════════════════════════════════════════════════════════
+🛣️ WEBHOOK ENDPOINT
+═══════════════════════════════════════════════════════════════════
+
+Endpoint: POST /voiceflow/webhook
+Authentication: PUBLIC (no JWT token required)
+Rate Limiting: Consider adding for production
+
+Request Format:
+```json
+{
+  "intent": "get_products",
+  "companyId": "607f1f77bcf86cd799439022",
+  "parameters": {
+    "limit": 5,
+    "category": "electronics"
+  },
+  "userId": "user123" // Optional
+}
+```
+
+Response Format:
+```json
+{
+  "success": true,
+  "intent": "get_products",
+  "data": {
+    "products": [
+      {
+        "id": "...",
+        "name": "Premium Laptop",
+        "description": "High-performance laptop",
+        "price": 999.99
+      }
+    ],
+    "total": 2
+  },
+  "message": "I found 2 products for you. Premium Laptop is priced at $999.99.",
+  "timestamp": "2026-01-15T10:30:00Z"
+}
+```
+
+═══════════════════════════════════════════════════════════════════
+🎯 SUPPORTED INTENTS
+═══════════════════════════════════════════════════════════════════
+
+1. get_products / list_products / show_products
+   ─────────────────────────────────────────────
+   Returns all products for a company
+   
+   Parameters:
+   - limit (optional): Number of products to return
+   
+   Example:
+   { "intent": "get_products", "companyId": "xxx", "parameters": {"limit": 5} }
+
+2. get_product_details / product_info
+   ───────────────────────────────────
+   Returns details for a specific product
+   
+   Parameters:
+   - productName (required): Name of product to find
+   
+   Example:
+   { "intent": "get_product_details", "companyId": "xxx", "parameters": {"productName": "Laptop"} }
+
+3. search_products
+   ───────────────
+   Searches products by name or description
+   
+   Parameters:
+   - query (required): Search term
+   
+   Example:
+   { "intent": "search_products", "companyId": "xxx", "parameters": {"query": "wireless"} }
+
+4. get_projects / list_projects
+   ────────────────────────────
+   Returns all projects
+   
+   Parameters:
+   - limit (optional): Number of projects to return
+   
+   Example:
+   { "intent": "get_projects", "companyId": "xxx" }
+
+5. get_offers / list_offers / show_deals
+   ──────────────────────────────────────
+   Returns all offers, sorted by discount (best first)
+   
+   Example:
+   { "intent": "get_offers", "companyId": "xxx" }
+
+6. get_company_info / company_details
+   ───────────────────────────────────
+   Returns company information
+   
+   Example:
+   { "intent": "get_company_info", "companyId": "xxx" }
+
+═══════════════════════════════════════════════════════════════════
+💡 VOICEFLOW INTEGRATION SETUP
+═══════════════════════════════════════════════════════════════════
+
+Step 1: Create API Block in Voiceflow
+──────────────────────────────────────
+1. Add "API" block to your Voiceflow flow
+2. Set Method: POST
+3. Set URL: https://your-api.com/voiceflow/webhook
+4. Set Headers: Content-Type: application/json
+
+Step 2: Configure Request Body
+───────────────────────────────
+```json
+{
+  "intent": "get_products",
+  "companyId": "{company_id}",
+  "parameters": {
+    "limit": 5
+  }
+}
+```
+
+Note: {company_id} should be stored in Voiceflow variables
+
+Step 3: Map Response to Variables
+──────────────────────────────────
+In Voiceflow, extract response data:
+- response.data.products → Save to {products}
+- response.message → Use in Text block
+
+Step 4: Display Results
+───────────────────────
+Use Text block with:
+"{response.message}"
+
+Or loop through products:
+"We have {products[0].name} for ${products[0].price}"
+
+═══════════════════════════════════════════════════════════════════
+🔒 SECURITY CONSIDERATIONS
+═══════════════════════════════════════════════════════════════════
+
+Why Public Endpoint?
+────────────────────
+- Voiceflow needs to call webhook without user authentication
+- Company ID serves as the access key
+- Consider these enhancements for production:
+
+Production Security Enhancements:
+──────────────────────────────────
+1. API Key Authentication
+   Add X-API-Key header check:
+   ```typescript
+   if (request.headers['x-api-key'] !== process.env.WEBHOOK_API_KEY) {
+     throw new UnauthorizedException();
+   }
+   ```
+
+2. Rate Limiting
+   Implement rate limiting per company:
+   ```typescript
+   @UseGuards(ThrottlerGuard)
+   @Throttle(10, 60) // 10 requests per minute
+   ```
+
+3. Request Signing
+   Verify requests come from Voiceflow:
+   - Check signature in headers
+   - Validate timestamp to prevent replay attacks
+
+4. IP Whitelisting
+   Only allow requests from Voiceflow IPs
+
+5. Webhook Secrets
+   Store per-company webhook secrets
+   Validate signature on each request
+
+═══════════════════════════════════════════════════════════════════
+🧪 TESTING OVERVIEW
+═══════════════════════════════════════════════════════════════════
+
+Test Structure:
+───────────────
+nestjs-backend/
+├── src/
+│   ├── voiceflow/voiceflow.service.spec.ts    [Unit Tests]
+│   └── products/products.service.spec.ts      [Unit Tests]
+└── test/
+    ├── multi-tenant-security.e2e-spec.ts      [E2E Tests]
+    └── webhook-integration.e2e-spec.ts        [E2E Tests]
+
+Test Coverage:
+──────────────
+✅ Unit Tests: Service logic, data transformation
+✅ E2E Tests: Full request-response flows, security
+✅ Integration Tests: Multi-tenant access control
+
+═══════════════════════════════════════════════════════════════════
+🧪 UNIT TESTS
+═══════════════════════════════════════════════════════════════════
+
+VoiceflowService Tests:
+───────────────────────
+Location: src/voiceflow/voiceflow.service.spec.ts
+
+What's Tested:
+✅ Script generation with valid company ID
+✅ Error handling for invalid company ID
+✅ Error handling for non-existent company
+✅ Handling companies with no data
+✅ Cache key generation
+
+Example Test:
+```typescript
+it('should generate voiceflow script successfully', async () => {
+  const result = await service.generateScript(mockCompanyId.toString());
+  
+  expect(result.variables.company_name).toBe('Test Company');
+  expect(result.variables.products).toHaveLength(2);
+  expect(result.responses.length).toBeGreaterThan(0);
+});
+```
+
+ProductsService Tests:
+──────────────────────
+Location: src/products/products.service.spec.ts
+
+What's Tested:
+✅ Product creation with cache invalidation
+✅ Product retrieval (findAll, findOne)
+✅ Product updates with cache invalidation
+✅ Product deletion with cache invalidation
+✅ Error handling for invalid IDs
+✅ Error handling for non-existent products
+
+Example Test:
+```typescript
+it('should create a product and invalidate cache', async () => {
+  await service.create(mockCompanyId.toString(), createDto);
+  
+  expect(cacheInvalidationService.invalidateCompanyScript)
+    .toHaveBeenCalledWith(mockCompanyId.toString());
+});
+```
+
+Running Unit Tests:
+───────────────────
+npm run test                    # Run all unit tests
+npm run test:watch              # Watch mode
+npm run test:cov                # With coverage
+npm test voiceflow.service      # Specific test file
+
+═══════════════════════════════════════════════════════════════════
+🧪 E2E TESTS
+═══════════════════════════════════════════════════════════════════
+
+Multi-Tenant Security Tests:
+────────────────────────────
+Location: test/multi-tenant-security.e2e-spec.ts
+
+What's Tested:
+✅ User registration and login
+✅ Company creation
+✅ Cross-tenant access prevention (403 Forbidden)
+✅ Authorized access to own resources
+✅ Member access after being added
+✅ Unauthenticated access prevention
+
+Key Test Cases:
+```typescript
+it('should not allow Alice to access John company data', async () => {
+  await request(app.getHttpServer())
+    .get(`/companies/${johnCompanyId}/products`)
+    .set('Authorization', `Bearer ${aliceToken}`)
+    .expect(403);
+});
+
+it('should now allow Alice to access John company as member', async () => {
+  // After John adds Alice as member
+  await request(app.getHttpServer())
+    .get(`/companies/${johnCompanyId}/products`)
+    .set('Authorization', `Bearer ${aliceToken}`)
+    .expect(200);
+});
+```
+
+Webhook Integration Tests:
+──────────────────────────
+Location: test/webhook-integration.e2e-spec.ts
+
+What's Tested:
+✅ All intent handlers (get_products, search_products, etc.)
+✅ Parameter handling (limit, query, productName)
+✅ Error handling (invalid intent, missing company, bad params)
+✅ Public access (no authentication required)
+✅ Dynamic response generation
+
+Key Test Cases:
+```typescript
+it('should return products for valid company', async () => {
+  const response = await request(app.getHttpServer())
+    .post('/voiceflow/webhook')
+    .send({
+      intent: 'get_products',
+      companyId: companyId,
+    })
+    .expect(201);
+  
+  expect(response.body.success).toBe(true);
+  expect(response.body.data.products).toHaveLength(2);
+});
+
+it('should work without authentication token', async () => {
+  const response = await request(app.getHttpServer())
+    .post('/voiceflow/webhook')
+    .send({
+      intent: 'get_products',
+      companyId: companyId,
+    })
+    .expect(201);
+  
+  expect(response.body.success).toBe(true);
+});
+```
+
+Running E2E Tests:
+──────────────────
+npm run test:e2e                        # All E2E tests
+npm run test:e2e -- multi-tenant        # Specific test
+npm run test:e2e -- webhook             # Specific test
+
+⚠️ Note: E2E tests require a MongoDB connection!
+
+═══════════════════════════════════════════════════════════════════
+📊 TEST RESULTS INTERPRETATION
+═══════════════════════════════════════════════════════════════════
+
+Expected Output:
+────────────────
+PASS  src/voiceflow/voiceflow.service.spec.ts
+PASS  src/products/products.service.spec.ts
+PASS  test/multi-tenant-security.e2e-spec.ts
+PASS  test/webhook-integration.e2e-spec.ts
+
+Test Suites: 4 passed, 4 total
+Tests:       50+ passed, 50+ total
+
+Coverage Report:
+────────────────
+Run: npm run test:cov
+
+Expected coverage:
+- Statements: 80%+
+- Branches: 75%+
+- Functions: 80%+
+- Lines: 80%+
+
+═══════════════════════════════════════════════════════════════════
+🎯 REAL-WORLD USE CASES
+═══════════════════════════════════════════════════════════════════
+
+Voice Assistant Scenario:
+─────────────────────────
+User: "Alexa, ask My Company what products they have"
+Alexa/Voiceflow → POST /voiceflow/webhook
+                  { intent: "get_products", companyId: "xxx" }
+API → Returns product list
+Alexa → "We have Premium Laptop for $999.99 and Wireless Mouse for $29.99"
+
+Chatbot Scenario:
+─────────────────
+User: "Show me your special offers"
+Chatbot → POST /voiceflow/webhook
+          { intent: "get_offers", companyId: "xxx" }
+API → Returns offers
+Chatbot → "Great news! We have New Year Sale with 25% off!"
+
+Search Scenario:
+────────────────
+User: "Do you have any wireless products?"
+Bot → POST /voiceflow/webhook
+      { intent: "search_products", 
+        companyId: "xxx",
+        parameters: { query: "wireless" } }
+API → Searches products
+Bot → "Yes! I found Wireless Mouse for $29.99"
+
+═══════════════════════════════════════════════════════════════════
+🚀 PRODUCTION DEPLOYMENT
+═══════════════════════════════════════════════════════════════════
+
+Webhook Considerations:
+───────────────────────
+1. Add API key authentication
+2. Implement rate limiting
+3. Add request logging
+4. Monitor webhook usage
+5. Set up error alerting
+6. Cache frequently requested data
+7. Add timeout handling
+
+Testing in Production:
+──────────────────────
+1. Run tests in CI/CD pipeline
+2. Automated testing before deployment
+3. Smoke tests after deployment
+4. Monitor test coverage trends
+5. Performance testing under load
+
+═══════════════════════════════════════════════════════════════════
+📚 KEY LEARNINGS
+═══════════════════════════════════════════════════════════════════
+
+Webhook Integration:
+────────────────────
+✅ NLP intent mapping
+✅ Dynamic response generation
+✅ API contract design
+✅ Public endpoint security considerations
+✅ Real-world integration patterns
+
+Testing:
+────────
+✅ Unit testing with mocks
+✅ E2E testing full flows
+✅ Multi-tenant security testing
+✅ Test-driven development
+✅ Test coverage analysis
+✅ Integration testing patterns
+
+Professional Skills:
+────────────────────
+✅ Jest testing framework
+✅ Supertest for E2E
+✅ MongoDB test database management
+✅ Test fixtures and setup
+✅ Assertion best practices
+
+═══════════════════════════════════════════════════════════════════
+🎓 NEXT STEPS
+═══════════════════════════════════════════════════════════════════
+
+Enhance Webhooks:
+─────────────────
+- Add more intents (book appointment, get pricing, etc.)
+- Implement conversation state management
+- Add multilingual support
+- Create webhook analytics dashboard
+
+Enhance Testing:
+────────────────
+- Increase test coverage to 90%+
+- Add performance tests
+- Add load testing
+- Implement mutation testing
+- Add contract testing
+
+═══════════════════════════════════════════════════════════════════
+
+This implementation demonstrates professional-level webhook integration
+and comprehensive testing practices! 🚀
+
+Perfect for showcasing in interviews and portfolios!
+

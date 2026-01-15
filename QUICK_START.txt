@@ -1,0 +1,385 @@
+🚀 QUICK START GUIDE
+=====================
+
+Get your multi-tenant NestJS backend running in 5 minutes!
+
+═══════════════════════════════════════════════════════════════════
+📋 PREREQUISITES
+═══════════════════════════════════════════════════════════════════
+
+✅ Node.js (v16+)
+✅ MongoDB (local or Atlas)
+✅ npm or yarn
+
+═══════════════════════════════════════════════════════════════════
+⚙️ SETUP
+═══════════════════════════════════════════════════════════════════
+
+1. Install Dependencies
+   ────────────────────
+   npm install
+
+2. Configure Environment
+   ─────────────────────
+   Create .env file (or use existing):
+   
+   MONGODB_URI=mongodb://localhost:27017/nestjs-backend
+   # OR use individual credentials:
+   # MONGODB_HOST=localhost
+   # MONGODB_PORT=27017
+   # MONGODB_DATABASE=nestjs-backend
+   
+   JWT_SECRET=your-super-secret-key-change-in-production
+   NODE_ENV=development
+
+3. Build Project
+   ─────────────
+   npm run build
+   
+   Expected: ✅ Build successful (no errors)
+
+4. Start Server
+   ────────────
+   npm run start:dev
+   
+   Expected: Server running on http://localhost:3000
+
+5. Access API Documentation
+   ────────────────────────
+   Open browser: http://localhost:3000/api
+   
+   You'll see complete Swagger documentation!
+
+═══════════════════════════════════════════════════════════════════
+🧪 TEST THE API
+═══════════════════════════════════════════════════════════════════
+
+Using Swagger UI (Easiest):
+1. Go to http://localhost:3000/api
+2. Use "Try it out" on each endpoint
+3. Follow the workflow below
+
+Using curl/Postman:
+
+1. Register User
+   ─────────────
+   POST http://localhost:3000/auth/register
+   Content-Type: application/json
+   
+   {
+     "email": "john@example.com",
+     "password": "password123",
+     "firstName": "John",
+     "lastName": "Doe"
+   }
+   
+   Response: User created
+
+2. Login
+   ──────
+   POST http://localhost:3000/auth/login
+   Content-Type: application/json
+   
+   {
+     "email": "john@example.com",
+     "password": "password123"
+   }
+   
+   Response:
+   {
+     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   }
+   
+   💡 Copy this token! Use it in all requests below.
+
+3. Create Company
+   ──────────────
+   POST http://localhost:3000/companies
+   Authorization: Bearer YOUR_TOKEN_HERE
+   Content-Type: application/json
+   
+   {
+     "name": "Excel Cargo",
+     "websiteUrl": "https://excelcargo.com",
+     "phoneNumber": "+1234567890"
+   }
+   
+   Response: Company created with ID
+   💡 Copy the company _id!
+
+4. Create Product
+   ──────────────
+   POST http://localhost:3000/companies/COMPANY_ID/products
+   Authorization: Bearer YOUR_TOKEN_HERE
+   Content-Type: application/json
+   
+   {
+     "name": "Premium Laptop",
+     "description": "High-performance laptop for professionals",
+     "price": 999.99
+   }
+   
+   Response: Product created
+
+5. Create Project
+   ──────────────
+   POST http://localhost:3000/companies/COMPANY_ID/projects
+   Authorization: Bearer YOUR_TOKEN_HERE
+   Content-Type: application/json
+   
+   {
+     "title": "Mobile App Development",
+     "goal": "Build iOS and Android apps"
+   }
+   
+   Response: Project created
+
+6. Create Offer
+   ────────────
+   POST http://localhost:3000/companies/COMPANY_ID/offers
+   Authorization: Bearer YOUR_TOKEN_HERE
+   Content-Type: application/json
+   
+   {
+     "title": "New Year Sale",
+     "discount": 25
+   }
+   
+   Response: Offer created
+
+7. Generate Voiceflow Script 🔥
+   ────────────────────────────
+   GET http://localhost:3000/companies/COMPANY_ID/voiceflow/script
+   Authorization: Bearer YOUR_TOKEN_HERE
+   
+   Response: Complete Voiceflow-compatible JSON!
+   {
+     "variables": {
+       "company_name": "Excel Cargo",
+       "products": [...],
+       "projects": [...],
+       "offers": [...]
+     },
+     "responses": [
+       "Welcome to {{company_name}}!",
+       ...
+     ],
+     "generated_at": "2026-01-15T...",
+     "version": "v1"
+   }
+   
+   💡 First request: ~50-200ms (from DB)
+
+8. Request Again (Test Cache)
+   ──────────────────────────
+   GET http://localhost:3000/companies/COMPANY_ID/voiceflow/script
+   Authorization: Bearer YOUR_TOKEN_HERE
+   
+   💡 Second request: ~5-10ms (from cache!)
+   Same data, 10-40x faster!
+
+9. Update Product (Test Cache Invalidation)
+   ────────────────────────────────────────
+   PATCH http://localhost:3000/companies/COMPANY_ID/products/PRODUCT_ID
+   Authorization: Bearer YOUR_TOKEN_HERE
+   Content-Type: application/json
+   
+   {
+     "price": 899.99
+   }
+   
+   Response: Product updated
+   💡 Cache automatically invalidated!
+
+10. Get Fresh Script
+    ───────────────
+    GET http://localhost:3000/companies/COMPANY_ID/voiceflow/script
+    Authorization: Bearer YOUR_TOKEN_HERE
+    
+    💡 Shows updated price! Cache regenerated.
+
+═══════════════════════════════════════════════════════════════════
+🔐 TEST MULTI-TENANT SECURITY
+═══════════════════════════════════════════════════════════════════
+
+1. Register Second User
+   ────────────────────
+   POST http://localhost:3000/auth/register
+   
+   {
+     "email": "alice@example.com",
+     "password": "password123",
+     "firstName": "Alice",
+     "lastName": "Smith"
+   }
+
+2. Login as Alice
+   ──────────────
+   POST http://localhost:3000/auth/login
+   
+   {
+     "email": "alice@example.com",
+     "password": "password123"
+   }
+   
+   💡 Get Alice's token
+
+3. Try to Access John's Company
+   ────────────────────────────
+   GET http://localhost:3000/companies/JOHNS_COMPANY_ID/products
+   Authorization: Bearer ALICE_TOKEN
+   
+   Expected: 403 Forbidden ❌
+   Message: "Access denied: You do not have permission to access this company"
+   
+   ✅ Multi-tenant security working!
+
+4. Create Alice's Company
+   ──────────────────────
+   POST http://localhost:3000/companies
+   Authorization: Bearer ALICE_TOKEN
+   
+   {
+     "name": "Alice Corp",
+     "websiteUrl": "https://alicecorp.com",
+     "phoneNumber": "+9876543210"
+   }
+   
+   ✅ Alice can now manage her own company!
+
+═══════════════════════════════════════════════════════════════════
+👥 TEST MEMBER MANAGEMENT
+═══════════════════════════════════════════════════════════════════
+
+1. John Adds Alice as Member (as John)
+   ────────────────────────────────────
+   POST http://localhost:3000/companies/JOHNS_COMPANY_ID/members/ALICE_USER_ID
+   Authorization: Bearer JOHN_TOKEN
+   
+   Response: Alice added to company
+
+2. Alice Can Now Access (as Alice)
+   ────────────────────────────────
+   GET http://localhost:3000/companies/JOHNS_COMPANY_ID/products
+   Authorization: Bearer ALICE_TOKEN
+   
+   Expected: 200 OK ✅
+   Alice can now see John's company data!
+
+3. Alice Creates Product in John's Company
+   ────────────────────────────────────────
+   POST http://localhost:3000/companies/JOHNS_COMPANY_ID/products
+   Authorization: Bearer ALICE_TOKEN
+   
+   {
+     "name": "Product by Alice",
+     "description": "Created by team member",
+     "price": 499.99
+   }
+   
+   ✅ Members can manage resources!
+
+═══════════════════════════════════════════════════════════════════
+📊 MONITORING & DEBUGGING
+═══════════════════════════════════════════════════════════════════
+
+Check Server Logs:
+- Cache invalidation messages
+- Request logs
+- Error traces
+
+Example log output:
+[Cache] Invalidated Voiceflow script for company: 607f1f77bcf86cd799439022
+
+Database Check:
+mongo
+> use nestjs-backend
+> db.companies.find().pretty()
+> db.products.find().pretty()
+> db.users.find().pretty()
+
+═══════════════════════════════════════════════════════════════════
+🐛 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+Issue: Server won't start
+Solution: 
+- Check MongoDB is running
+- Verify .env configuration
+- Check port 3000 is available
+
+Issue: 401 Unauthorized
+Solution:
+- Check JWT token is included in Authorization header
+- Format: "Bearer YOUR_TOKEN"
+- Token expires after 24 hours
+
+Issue: 403 Forbidden
+Solution:
+- Verify you have access to the company
+- Check you're owner or member
+- SuperAdmin can access all companies
+
+Issue: 404 Not Found
+Solution:
+- Verify company/product/project/offer ID exists
+- Check ObjectId format is valid
+
+Issue: Cache not working
+Solution:
+- Check CacheModule is configured in app.module.ts
+- Verify cache-manager package is installed
+- Check console logs for cache messages
+
+═══════════════════════════════════════════════════════════════════
+📚 USEFUL COMMANDS
+═══════════════════════════════════════════════════════════════════
+
+Development:
+npm run start:dev        - Start with hot reload
+npm run build            - Build project
+npm run lint             - Check linting
+
+Testing:
+npm run test             - Run unit tests
+npm run test:e2e         - Run e2e tests
+npm run test:cov         - Coverage report
+
+Production:
+npm run build
+npm run start:prod       - Start production server
+
+═══════════════════════════════════════════════════════════════════
+📖 LEARN MORE
+═══════════════════════════════════════════════════════════════════
+
+Read these documentation files:
+
+1. MULTI_TENANT_ARCHITECTURE.txt
+   - Understand the data model
+   - Learn about security
+   - See all API routes
+
+2. AUTHORIZATION_EXAMPLES.txt
+   - Real-world security scenarios
+   - CompanyAccessGuard explained
+   - Multi-tenant patterns
+
+3. VOICEFLOW_FEATURE.txt
+   - Deep dive into Voiceflow API
+   - Data transformation
+   - Caching details
+
+4. COMPLETE_PROJECT_SUMMARY.txt
+   - Full project overview
+   - All features explained
+   - Use cases and examples
+
+═══════════════════════════════════════════════════════════════════
+
+🎉 You're all set! Start exploring the API!
+
+Need help? Check the documentation files or the Swagger UI.
+
+Happy Coding! 🚀
+
