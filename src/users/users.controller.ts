@@ -31,7 +31,7 @@ import { Role } from '../common/enums/role.enum';
 @ApiTags('users')
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -120,7 +120,7 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete user (Superadmin only)',
-    description: 'Cannot delete superadmin users',
+    description: 'Only superadmin role can delete users. Cannot delete superadmin users',
   })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({
@@ -128,7 +128,7 @@ export class UsersController {
     description: 'User deleted successfully',
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 403, description: 'Cannot delete superadmin' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Superadmin role required' })
   async delete(@Param('id') id: string): Promise<void> {
     await this.usersService.delete(id);
   }

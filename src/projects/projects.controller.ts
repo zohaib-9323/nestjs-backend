@@ -16,6 +16,9 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectResponseDto } from './dto/project-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../auth/guards/company-access.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -26,7 +29,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 
 @ApiTags('Projects')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 @Controller('companies/:companyId/projects')
 @UseGuards(JwtAuthGuard, CompanyAccessGuard)
 export class ProjectsController {
@@ -120,13 +123,18 @@ export class ProjectsController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPERADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a project' })
+  @ApiOperation({ 
+    summary: 'Delete a project (Superadmin only)',
+    description: 'Only superadmin role can delete projects',
+  })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({ status: 204, description: 'Project deleted successfully' })
   @ApiResponse({ status: 404, description: 'Project not found' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No company access' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Superadmin role required' })
   async remove(
     @Param('companyId') companyId: string,
     @Param('id') id: string,

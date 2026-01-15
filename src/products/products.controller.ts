@@ -16,6 +16,9 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../auth/guards/company-access.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -26,7 +29,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 
 @ApiTags('Products')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 @Controller('companies/:companyId/products')
 @UseGuards(JwtAuthGuard, CompanyAccessGuard)
 export class ProductsController {
@@ -120,13 +123,18 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPERADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a product' })
+  @ApiOperation({ 
+    summary: 'Delete a product (Superadmin only)',
+    description: 'Only superadmin role can delete products',
+  })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiResponse({ status: 204, description: 'Product deleted successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No company access' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Superadmin role required' })
   async remove(
     @Param('companyId') companyId: string,
     @Param('id') id: string,
