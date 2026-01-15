@@ -39,27 +39,32 @@ export class CompaniesController {
   @Post()
   @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new company' })
+  @ApiOperation({ 
+    summary: 'Create a new company',
+    description: 'Creates a new company and associates it with the specified user ID. The userId must be provided in the request body.'
+  })
   @ApiResponse({
     status: 201,
     description: 'Company successfully created',
     type: CompanyResponseDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 400, description: 'Invalid user ID' })
   async create(
     @Body() createCompanyDto: CreateCompanyDto,
     @CurrentUser() user: any,
   ): Promise<CompanyResponseDto> {
     console.log('[CompaniesController] Create company request:', {
-      userId: user.userId,
-      userEmail: user.email,
+      requestedUserId: createCompanyDto.userId,
+      authenticatedUser: user.userId,
       userRole: user.role,
       companyData: createCompanyDto,
     });
     
+    // Use userId from request body (not from JWT)
     const company = await this.companiesService.create(
       createCompanyDto,
-      user.userId,
+      createCompanyDto.userId,
     );
     
     return plainToInstance(CompanyResponseDto, company, {
@@ -69,22 +74,29 @@ export class CompaniesController {
 
   @Get()
   @Roles(Role.USER, Role.ADMIN, Role.SUPERADMIN)
-  @ApiOperation({ summary: 'Get all companies accessible to the current user' })
+  @ApiOperation({ 
+    summary: 'Get companies created by the authenticated user',
+    description: 'Returns all companies where the authenticated user is the owner/creator. SuperAdmin can see all companies.'
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of companies',
+    description: 'List of companies created by the user',
     type: [CompanyResponseDto],
   })
   async findAll(@CurrentUser() user: any): Promise<CompanyResponseDto[]> {
+    console.log('[CompaniesController] Fetching companies for user:', user.userId);
+    
     let companies;
 
     if (user.role === Role.SUPERADMIN) {
       // SuperAdmin can see all companies
       companies = await this.companiesService.findAll();
     } else {
-      // Regular users and admins see companies where they are owner or member
+      // Regular users and admins see only companies they created (where they are owner)
       companies = await this.companiesService.findUserCompanies(user.userId);
     }
+
+    console.log('[CompaniesController] Found companies:', companies.length);
 
     return companies.map((company) =>
       plainToInstance(CompanyResponseDto, company, {

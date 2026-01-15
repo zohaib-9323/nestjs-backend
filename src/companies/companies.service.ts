@@ -17,19 +17,22 @@ export class CompaniesService {
     private readonly usersService: UsersService,
   ) {}
 
-  async create(createCompanyDto: CreateCompanyDto, ownerId: string): Promise<Company> {
+  async create(createCompanyDto: CreateCompanyDto, userId: string): Promise<Company> {
     // Verify user exists
-    const user = await this.usersService.findOne(ownerId);
+    const user = await this.usersService.findOne(userId);
     
     console.log('[CompaniesService] Creating company for user:', {
-      userId: ownerId,
+      userId: userId,
       userEmail: user.email,
       companyName: createCompanyDto.name,
     });
 
+    // Remove userId from DTO before saving
+    const { userId: _, ...companyData } = createCompanyDto;
+
     const company = new this.companyModel({
-      ...createCompanyDto,
-      ownerId: new Types.ObjectId(ownerId),
+      ...companyData,
+      ownerId: new Types.ObjectId(userId),
     });
     
     const savedCompany = await company.save();
@@ -37,10 +40,11 @@ export class CompaniesService {
     console.log('[CompaniesService] Company created successfully:', {
       companyId: savedCompany._id.toString(),
       ownerId: savedCompany.ownerId.toString(),
+      createdForUserId: userId,
     });
 
     // Add company to user's companies array
-    await this.userModel.findByIdAndUpdate(ownerId, {
+    await this.userModel.findByIdAndUpdate(userId, {
       $addToSet: { companies: savedCompany._id },
     });
     
@@ -78,16 +82,17 @@ export class CompaniesService {
   }
 
   async findUserCompanies(userId: string): Promise<Company[]> {
-    // Find companies where user is owner or member
-    return await this.companyModel
-      .find({
-        $or: [
-          { ownerId: new Types.ObjectId(userId) },
-          { members: new Types.ObjectId(userId) },
-        ],
-      })
+    // Find companies where user is the owner (creator)
+    console.log('[CompaniesService] Finding companies for user:', userId);
+    
+    const companies = await this.companyModel
+      .find({ ownerId: new Types.ObjectId(userId) })
       .populate('ownerId', 'email firstName lastName')
       .exec();
+    
+    console.log('[CompaniesService] Found companies:', companies.length);
+    
+    return companies;
   }
 
   async addMember(companyId: string, userId: string): Promise<Company> {
