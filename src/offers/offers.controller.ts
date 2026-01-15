@@ -16,6 +16,9 @@ import { UpdateOfferDto } from './dto/update-offer.dto';
 import { OfferResponseDto } from './dto/offer-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CompanyAccessGuard } from '../auth/guards/company-access.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -26,7 +29,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 
 @ApiTags('Offers')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 @Controller('companies/:companyId/offers')
 @UseGuards(JwtAuthGuard, CompanyAccessGuard)
 export class OffersController {
@@ -113,13 +116,18 @@ export class OffersController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPERADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an offer' })
+  @ApiOperation({ 
+    summary: 'Delete an offer (Superadmin only)',
+    description: 'Only superadmin role can delete offers',
+  })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'id', description: 'Offer ID' })
   @ApiResponse({ status: 204, description: 'Offer deleted successfully' })
   @ApiResponse({ status: 404, description: 'Offer not found' })
-  @ApiResponse({ status: 403, description: 'Forbidden - No company access' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Superadmin role required' })
   async remove(
     @Param('companyId') companyId: string,
     @Param('id') id: string,

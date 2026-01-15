@@ -68,6 +68,7 @@ async function bootstrap() {
       - All endpoints require JWT authentication (except /auth/register, /auth/login, and webhook)
       - CompanyAccessGuard prevents cross-tenant access
       - Role-based authorization (SUPERADMIN, ADMIN, USER)
+      - DELETE operations require SUPERADMIN role
       `,
     )
     .setVersion('1.0')

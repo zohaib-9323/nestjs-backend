@@ -32,7 +32,7 @@ import { plainToInstance } from 'class-transformer';
 @ApiTags('Companies')
 @Controller('companies')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
@@ -239,10 +239,11 @@ export class CompaniesController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @Roles(Role.SUPERADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
-    summary: 'Delete company (Admin/Superadmin only)',
+    summary: 'Delete company (Superadmin only)',
+    description: 'Only superadmin role can delete companies',
   })
   @ApiParam({ name: 'id', description: 'Company ID' })
   @ApiResponse({
@@ -250,6 +251,7 @@ export class CompaniesController {
     description: 'Company deleted successfully',
   })
   @ApiResponse({ status: 404, description: 'Company not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Superadmin role required' })
   async delete(@Param('id') id: string): Promise<void> {
     await this.companiesService.delete(id);
   }
